@@ -41,7 +41,7 @@ void handle_mqtt_message(connection_t* conn, const uint8_t* data, size_t len) {
             if (conn->bytes_to_write + sizeof(connack) <= sizeof(conn->write_buffer)) {
                 memcpy(conn->write_buffer + conn->bytes_to_write, connack, sizeof(connack));
                 conn->bytes_to_write += sizeof(connack);
-                printf("[MQTT] CONNACK queued\n");
+                printf("[MQTT] CONNACK queued (%zu bytes)\n", sizeof(connack));
             }
             break;
         }
@@ -55,6 +55,29 @@ void handle_mqtt_message(connection_t* conn, const uint8_t* data, size_t len) {
                     // Extract topic name and payload...
                 }
             }
+            
+            // Send PUBACK for QoS 1
+            uint8_t flags = data[0] & 0x0F;
+            uint8_t qos = (flags >> 1) & 0x03;
+            if (qos == 1) {
+                uint8_t puback[] = {0x40, 0x02, data[2], data[3]}; // Copy packet ID
+                if (conn->bytes_to_write + sizeof(puback) <= sizeof(conn->write_buffer)) {
+                    memcpy(conn->write_buffer + conn->bytes_to_write, puback, sizeof(puback));
+                    conn->bytes_to_write += sizeof(puback);
+                    printf("[MQTT] PUBACK queued (%zu bytes)\n", sizeof(puback));
+                }
+            }
+            break;
+        }
+        case 8: { // SUBSCRIBE
+            printf("[MQTT] SUBSCRIBE received\n");
+            // Send SUBACK
+            uint8_t suback[] = {0x90, 0x03, data[2], data[3], 0x00}; // QoS 0
+            if (conn->bytes_to_write + sizeof(suback) <= sizeof(conn->write_buffer)) {
+                memcpy(conn->write_buffer + conn->bytes_to_write, suback, sizeof(suback));
+                conn->bytes_to_write += sizeof(suback);
+                printf("[MQTT] SUBACK queued (%zu bytes)\n", sizeof(suback));
+            }
             break;
         }
         case 12: { // PINGREQ
@@ -64,7 +87,7 @@ void handle_mqtt_message(connection_t* conn, const uint8_t* data, size_t len) {
             if (conn->bytes_to_write + sizeof(pingresp) <= sizeof(conn->write_buffer)) {
                 memcpy(conn->write_buffer + conn->bytes_to_write, pingresp, sizeof(pingresp));
                 conn->bytes_to_write += sizeof(pingresp);
-                printf("[MQTT] PINGRESP queued\n");
+                printf("[MQTT] PINGRESP queued (%zu bytes)\n", sizeof(pingresp));
             }
             break;
         }
@@ -155,27 +178,31 @@ void handle_http_message(connection_t* conn, const uint8_t* data, size_t len) {
         }
     }
     
-    // Generate HTTP response
-    char response[1024];
+    // Generate HTTP response based on method
+    char response[2048];
     const char* status_line = "HTTP/1.1 200 OK\r\n";
     const char* headers = 
         "Content-Type: application/json\r\n"
-        "Server: Protocol-Middleware/1.0\r\n"
-        "Access-Control-Allow-Origin: *\r\n";
+        "Server: PaumIoT-Enhanced/1.0\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Connection: close\r\n";
     
     const char* body_template = "{\n"
         "  \"status\": \"success\",\n"
-        "  \"message\": \"Hello from HTTP middleware\",\n"
+        "  \"message\": \"Enhanced protocol detection working\",\n"
         "  \"protocol\": \"HTTP\",\n"
         "  \"method\": \"%s\",\n"
         "  \"uri\": \"%s\",\n"
-        "  \"timestamp\": %ld\n"
+        "  \"detection_confidence\": %d,\n"
+        "  \"timestamp\": %ld,\n"
+        "  \"server\": \"PaumIoT-Enhanced\"\n"
         "}";
     
-    char json_body[512];
+    char json_body[1024];
     snprintf(json_body, sizeof(json_body), body_template, 
              conn->protocol_data.http.method,
              conn->protocol_data.http.uri,
+             conn->detection_confidence,
              time(NULL));
     
     snprintf(response, sizeof(response),
@@ -186,13 +213,13 @@ void handle_http_message(connection_t* conn, const uint8_t* data, size_t len) {
     if (conn->bytes_to_write + response_len <= sizeof(conn->write_buffer)) {
         memcpy(conn->write_buffer + conn->bytes_to_write, response, response_len);
         conn->bytes_to_write += response_len;
-        printf("[HTTP] Response queued (%zu bytes)\n", response_len);
+        printf("[HTTP] Response queued (%zu bytes) for %s %s\n", response_len, method, uri);
+    } else {
+        printf("[HTTP] ERROR: Response too large for buffer\n");
     }
     
-    // Close connection if requested
-    if (conn->protocol_data.http.connection_close) {
-        conn->session_state = SESSION_DISCONNECTING;
-    }
+    // Close connection after response
+    conn->session_state = SESSION_DISCONNECTING;
 }
 
 void handle_dns_message(connection_t* conn, const uint8_t* data, size_t len, struct sockaddr_in* client_addr) {
@@ -320,6 +347,115 @@ void handle_dns_message(connection_t* conn, const uint8_t* data, size_t len, str
     }
 }
 
+void handle_tls_message(connection_t* conn, const uint8_t* data, size_t len) {
+    printf("[TLS] Processing TLS record from %s\n", conn->session_id);
+    
+    if (len < 5) {
+        printf("[TLS] Packet too short for TLS header\n");
+        return;
+    }
+    
+    // Parse TLS record header
+    uint8_t content_type = data[0];
+    uint16_t version = (data[1] << 8) | data[2];
+    uint16_t record_length = (data[3] << 8) | data[4];
+    
+    conn->protocol_data.tls.content_type = content_type;
+    conn->protocol_data.tls.version = version;
+    conn->protocol_data.tls.record_length = record_length;
+    
+    printf("[TLS] Content Type: %d, Version: 0x%04X, Length: %d\n", 
+           content_type, version, record_length);
+    
+    // Handle different content types
+    switch (content_type) {
+        case TLS_HANDSHAKE:
+            if (len >= 6) {
+                uint8_t handshake_type = data[5];
+                conn->protocol_data.tls.handshake_type = handshake_type;
+                printf("[TLS] Handshake Type: %d\n", handshake_type);
+                
+                if (handshake_type == TLS_CLIENT_HELLO) {
+                    printf("[TLS] Client Hello detected - starting handshake\n");
+                    conn->session_state = SESSION_AUTHENTICATED;
+                    conn->session_flags.flags |= SESSION_FLAG_TLS_ESTABLISHED;
+                }
+            }
+            break;
+            
+        case TLS_APPLICATION_DATA:
+            printf("[TLS] Application data - encrypted payload\n");
+            break;
+            
+        case TLS_ALERT:
+            printf("[TLS] Alert message received\n");
+            break;
+            
+        case TLS_CHANGE_CIPHER_SPEC:
+            printf("[TLS] Change Cipher Spec - encryption established\n");
+            conn->session_flags.flags |= SESSION_FLAG_TLS_ESTABLISHED;
+            break;
+    }
+    
+    // For TLS, we typically don't send responses in the same way
+    // The TLS handshake is handled by the underlying transport
+    printf("[TLS] TLS record processed successfully\n");
+}
+
+void handle_quic_message(connection_t* conn, const uint8_t* data, size_t len) {
+    printf("[QUIC] Processing QUIC packet from %s\n", conn->session_id);
+    
+    if (len < 6) {
+        printf("[QUIC] Packet too short for QUIC header\n");
+        return;
+    }
+    
+    // Parse QUIC header
+    uint8_t first_byte = data[0];
+    uint8_t packet_type = (first_byte >> 4) & 0x0F;
+    uint8_t long_header = (first_byte >> 7) & 0x01;
+    
+    conn->protocol_data.quic.packet_type = packet_type;
+    
+    printf("[QUIC] Packet Type: %d, Long Header: %s\n", 
+           packet_type, long_header ? "Yes" : "No");
+    
+    if (long_header) {
+        // Long header packet
+        if (len >= 5) {
+            uint32_t version = (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4];
+            conn->protocol_data.quic.version = version;
+            printf("[QUIC] Version: 0x%08X\n", version);
+            
+            // Parse connection ID length
+            if (len >= 6) {
+                uint8_t dcil = (data[5] >> 4) & 0x0F;
+                uint8_t scil = data[5] & 0x0F;
+                printf("[QUIC] DCIL: %d, SCIL: %d\n", dcil, scil);
+                
+                // Extract connection ID (simplified)
+                if (dcil > 0 && len >= 6 + dcil) {
+                    uint64_t conn_id = 0;
+                    for (int i = 0; i < dcil && i < 8; i++) {
+                        conn_id = (conn_id << 8) | data[6 + i];
+                    }
+                    conn->protocol_data.quic.connection_id = conn_id;
+                    conn->protocol_data.quic.connection_id_length = dcil;
+                    printf("[QUIC] Connection ID: 0x%016lX\n", conn_id);
+                }
+            }
+        }
+    } else {
+        // Short header packet
+        printf("[QUIC] Short header packet - connection established\n");
+        conn->session_state = SESSION_AUTHENTICATED;
+    }
+    
+    // QUIC is typically handled at the transport level
+    // We acknowledge receipt but don't generate application-level responses
+    printf("[QUIC] QUIC packet processed successfully\n");
+}
+
 // Generic protocol message processor
 void process_protocol_message(connection_t* conn, const uint8_t* data, size_t len) {
     switch (conn->protocol) {
@@ -334,6 +470,12 @@ void process_protocol_message(connection_t* conn, const uint8_t* data, size_t le
             break;
         case PROTOCOL_DNS:
             handle_dns_message(conn, data, len, &conn->addr);
+            break;
+        case PROTOCOL_TLS:
+            handle_tls_message(conn, data, len);
+            break;
+        case PROTOCOL_QUIC:
+            handle_quic_message(conn, data, len);
             break;
         default:
             printf("[PROTOCOL] Unsupported protocol: %d\n", conn->protocol);

@@ -259,10 +259,27 @@ int handle_udp_message(void) {
         return -1;
     }
     
-    protocol_type_t protocol = detect_protocol_fast(buffer, received);
-    printf("[UDP] Received %zd bytes from %s:%d - Protocol: %s\n",
+    uint8_t confidence = 0;
+    protocol_type_t protocol = detect_protocol_enhanced(buffer, received, &confidence, 0);
+    printf("[UDP] Received %zd bytes from %s:%d - Protocol: %s (confidence: %d%%)\n",
            received, inet_ntoa(client_addr.sin_addr), 
-           ntohs(client_addr.sin_port), protocol_to_string(protocol));
+           ntohs(client_addr.sin_port), protocol_to_string(protocol), confidence);
+    
+    // Update enhanced statistics
+    g_server.enhanced_stats.total_packets++;
+    if (protocol != PROTOCOL_UNKNOWN) {
+        g_server.enhanced_stats.identified_packets++;
+        g_server.enhanced_stats.protocol_count[protocol]++;
+        g_server.enhanced_stats.udp_packets_processed++;
+        
+        if (confidence >= DETECTION_CONFIDENCE_HIGH) {
+            g_server.enhanced_stats.detection_confidence_high++;
+        } else if (confidence >= DETECTION_CONFIDENCE_MEDIUM) {
+            g_server.enhanced_stats.detection_confidence_medium++;
+        } else if (confidence >= DETECTION_CONFIDENCE_LOW) {
+            g_server.enhanced_stats.detection_confidence_low++;
+        }
+    }
     
     // Simple UDP response based on protocol
     const char* response = NULL;
@@ -338,16 +355,53 @@ int handle_connection_read(connection_t* conn) {
     
     // Detect protocol if not known
     if (conn->protocol == PROTOCOL_UNKNOWN && conn->read_pos >= 4) {
-        conn->protocol = detect_protocol_fast(conn->read_buffer, conn->read_pos);
-        printf("[READ] Protocol detected: %s for fd=%d\n", 
-               protocol_to_string(conn->protocol), conn->fd);
+        uint8_t confidence = 0;
+        conn->protocol = detect_protocol_enhanced(conn->read_buffer, conn->read_pos, &confidence, 1);
+        conn->detection_confidence = confidence;
+        conn->detection_attempts++;
+        conn->last_detection = time(NULL);
+        
+        printf("[READ] Protocol detected: %s for fd=%d (confidence: %d%%)\n", 
+               protocol_to_string(conn->protocol), conn->fd, confidence);
+        
+        // Update enhanced statistics
+        if (conn->protocol != PROTOCOL_UNKNOWN) {
+            g_server.enhanced_stats.identified_packets++;
+            g_server.enhanced_stats.protocol_count[conn->protocol]++;
+            
+            if (confidence >= DETECTION_CONFIDENCE_HIGH) {
+                g_server.enhanced_stats.detection_confidence_high++;
+            } else if (confidence >= DETECTION_CONFIDENCE_MEDIUM) {
+                g_server.enhanced_stats.detection_confidence_medium++;
+            } else if (confidence >= DETECTION_CONFIDENCE_LOW) {
+                g_server.enhanced_stats.detection_confidence_low++;
+            }
+        }
     }
     
     // Process complete messages
     if (conn->read_pos > 0) {
+        printf("[READ] Processing %zu bytes for protocol %s\n", 
+               conn->read_pos, protocol_to_string(conn->protocol));
+        
         process_protocol_message(conn, conn->read_buffer, conn->read_pos);
         update_congestion_window(conn, 1); // Successful processing
         update_session_activity(conn);
+        
+        // Check if we have data to write
+        if (conn->bytes_to_write > 0) {
+            printf("[READ] fd=%d has %zu bytes to write, enabling EPOLLOUT\n", 
+                   conn->fd, conn->bytes_to_write);
+            
+            // Enable write events
+            struct epoll_event ev;
+            ev.events = EPOLLIN | EPOLLOUT | EPOLLET;
+            ev.data.ptr = conn;
+            if (epoll_ctl(g_server.epoll_fd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+                perror("epoll_ctl MOD EPOLLOUT");
+                return -1;
+            }
+        }
         
         // Reset read buffer
         conn->read_pos = 0;

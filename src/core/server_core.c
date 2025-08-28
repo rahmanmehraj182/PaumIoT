@@ -16,12 +16,40 @@ server_state_t g_server = {0};
 volatile int g_running = 1;
 
 int server_init(void) {
-    printf("Event-Driven Protocol Middleware with Congestion Control\n");
+    printf("Event-Driven Protocol Middleware with Enhanced Detection\n");
     printf("========================================================\n");
     
     // Initialize server state
     memset(&g_server, 0, sizeof(server_state_t));
     pthread_mutex_init(&g_server.table_mutex, NULL);
+    pthread_mutex_init(&g_server.detection_mutex, NULL);
+    
+    // Initialize dynamic confidence system
+    g_server.enhanced_stats.confidence_calibration_factor = 1.0f;
+    g_server.enhanced_stats.average_confidence_error = 0.0f;
+    g_server.enhanced_stats.confidence_history_index = 0;
+    
+    // Initialize protocol accuracy tracking
+    for (int i = 0; i < 7; i++) {
+        g_server.enhanced_stats.protocol_accuracy[i].total_detections = 0;
+        g_server.enhanced_stats.protocol_accuracy[i].correct_detections = 0;
+        g_server.enhanced_stats.protocol_accuracy[i].false_positives = 0;
+        g_server.enhanced_stats.protocol_accuracy[i].false_negatives = 0;
+        g_server.enhanced_stats.protocol_accuracy[i].accuracy_rate = 0.7f; // Default accuracy
+        g_server.enhanced_stats.protocol_accuracy[i].precision_rate = 0.7f;
+        g_server.enhanced_stats.protocol_accuracy[i].recall_rate = 0.7f;
+        g_server.enhanced_stats.protocol_accuracy[i].f1_score = 0.7f;
+        g_server.enhanced_stats.protocol_accuracy[i].confidence_adjustment = 1.0f;
+        g_server.enhanced_stats.protocol_accuracy[i].last_update = time(NULL);
+    }
+    
+    // Initialize enhanced protocol detection
+    if (init_packet_capture() != 0) {
+        printf("Warning: Enhanced packet capture initialization failed\n");
+        printf("Continuing with basic protocol detection only\n");
+    } else {
+        printf("Enhanced protocol detection system initialized\n");
+    }
     
     // Create epoll
     g_server.epoll_fd = epoll_create1(0);
@@ -72,8 +100,8 @@ int server_init(void) {
     }
     
     printf("Server listening on port %d\n", SERVER_PORT);
-    printf("Event-driven architecture with congestion control active\n");
-    printf("Supported protocols: HTTP, MQTT, CoAP, DNS\n\n");
+    printf("Enhanced event-driven architecture with protocol detection active\n");
+    printf("Supported protocols: HTTP, MQTT, CoAP, DNS, TLS, QUIC\n\n");
     
     return 0;
 }
@@ -158,6 +186,9 @@ void server_run(void) {
 }
 
 void server_cleanup(void) {
+    // Cleanup enhanced protocol detection
+    cleanup_packet_capture();
+    
     // Close all connections
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (g_server.connections[i].fd > 0) {
@@ -170,8 +201,12 @@ void server_cleanup(void) {
     if (g_server.udp_socket > 0) close(g_server.udp_socket);
     if (g_server.epoll_fd > 0) close(g_server.epoll_fd);
     
-    // Cleanup mutex
+    // Cleanup mutexes
     pthread_mutex_destroy(&g_server.table_mutex);
+    pthread_mutex_destroy(&g_server.detection_mutex);
+    
+    // Print final enhanced statistics
+    print_enhanced_stats();
     
     printf("Server shutdown complete\n");
 }
@@ -180,7 +215,7 @@ void server_cleanup(void) {
 void print_server_stats(void) {
     printf("\n=== SERVER STATISTICS ===\n");
     printf("Active connections: %u/%d\n", g_server.active_connections, MAX_CLIENTS);
-    printf("Total bytes processed: %llu MB\n", g_server.total_bytes_processed / (1024*1024));
+    printf("Total bytes processed: %lu MB\n", g_server.total_bytes_processed / (1024*1024));
     printf("System load: %u%%\n", g_server.system_load);
     
     // Per-connection stats

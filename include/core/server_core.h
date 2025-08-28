@@ -14,5 +14,10 @@ void server_cleanup(void);
 
 // Statistics and monitoring
 void print_server_stats(void);
+void print_enhanced_stats(void);
+
+// Enhanced protocol detection functions
+int init_packet_capture(void);
+void cleanup_packet_capture(void);
 
 #endif // SERVER_CORE_H

@@ -9,6 +9,8 @@ void handle_mqtt_message(connection_t *conn, const uint8_t *data, size_t len);
 void handle_coap_message(connection_t *conn, const uint8_t *data, size_t len);
 void handle_http_message(connection_t *conn, const uint8_t *data, size_t len);
 void handle_dns_message(connection_t *conn, const uint8_t *data, size_t len, struct sockaddr_in *client_addr);
+void handle_tls_message(connection_t *conn, const uint8_t *data, size_t len);
+void handle_quic_message(connection_t *conn, const uint8_t *data, size_t len);
 
 // Generic protocol message processor
 void process_protocol_message(connection_t *conn, const uint8_t *data, size_t len);

@@ -7,15 +7,49 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-// Protocol types
+// Protocol types (enhanced with new protocols)
 typedef enum
 {
     PROTOCOL_UNKNOWN = 0,
     PROTOCOL_MQTT = 1,
     PROTOCOL_COAP = 2,
     PROTOCOL_HTTP = 3,
-    PROTOCOL_DNS = 4
+    PROTOCOL_DNS = 4,
+    PROTOCOL_TLS = 5,
+    PROTOCOL_QUIC = 6
 } protocol_type_t;
+
+// TLS Content Types
+#define TLS_CHANGE_CIPHER_SPEC 20
+#define TLS_ALERT              21
+#define TLS_HANDSHAKE          22
+#define TLS_APPLICATION_DATA   23
+
+// TLS Handshake Types
+#define TLS_HELLO_REQUEST       0
+#define TLS_CLIENT_HELLO        1
+#define TLS_SERVER_HELLO        2
+#define TLS_CERTIFICATE         11
+#define TLS_SERVER_KEY_EXCHANGE 12
+#define TLS_CERTIFICATE_REQUEST 13
+#define TLS_SERVER_HELLO_DONE   14
+#define TLS_CERTIFICATE_VERIFY  15
+#define TLS_CLIENT_KEY_EXCHANGE 16
+#define TLS_FINISHED            20
+
+// Enhanced Protocol Detection Configuration
+#define STATE_TABLE_SIZE 1024
+#define CONNECTION_TIMEOUT 300 // 5 minutes
+#define DETECTION_CONFIDENCE_HIGH 90
+#define DETECTION_CONFIDENCE_MEDIUM 70
+#define DETECTION_CONFIDENCE_LOW 50
+
+// Dynamic Confidence System Configuration
+#define MAX_CONFIDENCE_FEATURES 10
+#define CONFIDENCE_HISTORY_SIZE 1000
+#define ADAPTIVE_LEARNING_RATE 0.1
+#define MIN_CONFIDENCE_THRESHOLD 30
+#define MAX_CONFIDENCE_THRESHOLD 100
 
 // Connection states
 typedef enum
@@ -50,7 +84,7 @@ typedef struct
     // 4: observe_active (CoAP)
     // 5: http_keep_alive (HTTP)
     // 6: dns_recursive (DNS)
-    // 7: reserved
+    // 7: tls_established (TLS)
     // 8-15: protocol_specific_flags
     // 16-31: reserved for future use
 } session_flags_t;
@@ -63,6 +97,20 @@ typedef struct
 #define SESSION_FLAG_OBSERVE_ACTIVE (1U << 4)
 #define SESSION_FLAG_HTTP_KEEPALIVE (1U << 5)
 #define SESSION_FLAG_DNS_RECURSIVE (1U << 6)
+#define SESSION_FLAG_TLS_ESTABLISHED (1U << 7)
+
+// Enhanced TCP Connection State for Protocol Detection
+typedef struct tcp_connection_state {
+    uint32_t src_ip;
+    uint32_t dst_ip;
+    uint16_t src_port;
+    uint16_t dst_port;
+    protocol_type_t protocol;
+    time_t last_seen;
+    uint32_t seq_number;
+    uint8_t confidence;
+    struct tcp_connection_state *next;
+} tcp_connection_state_t;
 
 // Protocol-specific data
 typedef union
@@ -104,6 +152,23 @@ typedef union
         uint16_t query_type;
     } dns;
 
+    struct
+    {
+        uint8_t content_type;
+        uint16_t version;
+        uint16_t record_length;
+        uint8_t handshake_type;
+        uint8_t cipher_suite[2];
+    } tls;
+
+    struct
+    {
+        uint32_t version;
+        uint8_t packet_type;
+        uint8_t connection_id_length;
+        uint64_t connection_id;
+    } quic;
+
     uint8_t raw_data[256]; // Increased size for HTTP/DNS data
 } protocol_data_t;
 
@@ -134,6 +199,11 @@ typedef struct connection
     session_flags_t session_flags;
     protocol_data_t protocol_data;
 
+    // Enhanced protocol detection
+    uint8_t detection_confidence;
+    uint32_t detection_attempts;
+    time_t last_detection;
+
     // Buffers
     uint8_t read_buffer[4096];
     uint8_t write_buffer[4096];
@@ -160,6 +230,63 @@ typedef struct connection
     char padding[0] __attribute__((aligned(64)));
 } connection_t;
 
+// Dynamic Confidence Features Structure
+typedef struct {
+    float entropy_score;           // Packet entropy (0-1)
+    float pattern_strength;        // Pattern distinctiveness (0-1)
+    float validation_depth;        // Number of validation checks passed (0-1)
+    float header_consistency;      // Header field consistency (0-1)
+    float payload_structure;       // Payload structure validity (0-1)
+    float transport_compatibility; // Transport layer compatibility (0-1)
+    float context_relevance;       // Context relevance score (0-1)
+    float historical_accuracy;     // Historical detection accuracy (0-1)
+    float false_positive_risk;     // False positive risk assessment (0-1)
+    float protocol_specificity;    // Protocol-specific features (0-1)
+} confidence_features_t;
+
+// Protocol Accuracy Tracking Structure
+typedef struct {
+    uint32_t total_detections;
+    uint32_t correct_detections;
+    uint32_t false_positives;
+    uint32_t false_negatives;
+    float accuracy_rate;
+    float precision_rate;
+    float recall_rate;
+    float f1_score;
+    float confidence_adjustment;
+    time_t last_update;
+} protocol_accuracy_t;
+
+// Confidence History Entry
+typedef struct {
+    protocol_type_t protocol;
+    uint8_t predicted_confidence;
+    uint8_t actual_confidence;
+    uint8_t was_correct;
+    time_t timestamp;
+    confidence_features_t features;
+} confidence_history_entry_t;
+
+// Enhanced Statistics Structure
+typedef struct {
+    uint64_t total_packets;
+    uint64_t identified_packets;
+    uint64_t protocol_count[7]; // PROTOCOL_UNKNOWN to PROTOCOL_QUIC
+    uint64_t detection_confidence_high;
+    uint64_t detection_confidence_medium;
+    uint64_t detection_confidence_low;
+    uint64_t tcp_connections_tracked;
+    uint64_t udp_packets_processed;
+    
+    // Dynamic confidence statistics
+    protocol_accuracy_t protocol_accuracy[7]; // Per-protocol accuracy tracking
+    confidence_history_entry_t confidence_history[CONFIDENCE_HISTORY_SIZE];
+    uint32_t confidence_history_index;
+    float average_confidence_error;
+    float confidence_calibration_factor;
+} enhanced_stats_t;
+
 // Server state
 typedef struct
 {
@@ -174,6 +301,11 @@ typedef struct
     int session_count;
     pthread_mutex_t table_mutex;
     int next_session_index;
+    
+    // Enhanced protocol detection state
+    tcp_connection_state_t *state_table[STATE_TABLE_SIZE];
+    pthread_mutex_t detection_mutex;
+    enhanced_stats_t enhanced_stats;
 } server_state_t;
 
 // Constants
