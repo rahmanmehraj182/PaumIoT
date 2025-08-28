@@ -354,7 +354,7 @@ int handle_connection_read(connection_t* conn) {
     }
     
     // Detect protocol if not known
-    if (conn->protocol == PROTOCOL_UNKNOWN && conn->read_pos >= 4) {
+    if (conn->protocol == PROTOCOL_UNKNOWN && conn->read_pos >= 2) {
         uint8_t confidence = 0;
         conn->protocol = detect_protocol_enhanced(conn->read_buffer, conn->read_pos, &confidence, 1);
         conn->detection_confidence = confidence;
@@ -363,6 +363,11 @@ int handle_connection_read(connection_t* conn) {
         
         printf("[READ] Protocol detected: %s for fd=%d (confidence: %d%%)\n", 
                protocol_to_string(conn->protocol), conn->fd, confidence);
+        
+        // Update session protocol
+        if (conn->protocol != PROTOCOL_UNKNOWN) {
+            update_session_protocol(conn->fd, conn->protocol);
+        }
         
         // Update enhanced statistics
         if (conn->protocol != PROTOCOL_UNKNOWN) {

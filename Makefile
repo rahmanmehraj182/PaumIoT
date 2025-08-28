@@ -81,6 +81,11 @@ test-confidence: $(TARGET)
 	@echo "Running dynamic confidence system test..."
 	@./tests/dynamic_confidence_test.sh
 
+# Packet library demonstration
+test-packets: $(TARGET)
+	@echo "Running packet library demonstration..."
+	@./tests/packet_demo.sh
+
 # Development helpers
 debug: CFLAGS += -DDEBUG -g3
 debug: $(TARGET)
@@ -100,6 +105,7 @@ help:
 	@echo "  test     - Run basic connectivity tests"
 	@echo "  test-enhanced - Run comprehensive enhanced protocol detection tests"
 	@echo "  test-confidence - Run dynamic confidence system tests"
+	@echo "  test-packets - Run packet library demonstration"
 	@echo "  install  - Install to /usr/local/bin"
 	@echo "  help     - Show this help message"
 	@echo ""
@@ -107,4 +113,4 @@ help:
 	@echo "  - libpcap-dev (for enhanced packet capture)"
 	@echo "  - mosquitto-clients (for MQTT testing)"
 
-.PHONY: all clean install test test-enhanced debug release help
+.PHONY: all clean install test test-enhanced test-confidence test-packets debug release help

@@ -1,0 +1,67 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+paumiot
+
+# Documentation and logs
+docs/
+logs/
+*.log
+*.md
+!README.md
+
+# Project folders
+tests/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Test output
+test_*.log
+session_*.log
+multi_test.log
+session_fixed.log
+
+# Core dumps
+core
+core.*
+
+# Debug files
+*.dSYM/
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+
+# Valgrind output
+valgrind-out.txt
+
+# Network capture files
+*.pcap
+*.cap
+
+# Configuration files with sensitive data
+config.ini
+*.conf
+!Makefile
+
+# Backup files
+*~
+*.orig
+*.rej

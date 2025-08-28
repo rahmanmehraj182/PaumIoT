@@ -143,6 +143,8 @@ protocol_type_t detect_protocol_fast(const uint8_t* data, size_t len) {
 // Enhanced protocol detection with dynamic confidence scoring
 protocol_type_t detect_protocol_enhanced(const uint8_t* data, size_t len, 
                                         uint8_t *confidence, int is_tcp) {
+
+    
     if (len < 2) {
         *confidence = 0;
         return PROTOCOL_UNKNOWN;
@@ -186,6 +188,8 @@ protocol_type_t detect_protocol_enhanced(const uint8_t* data, size_t len,
         *confidence = calculate_dynamic_confidence(PROTOCOL_MQTT, data, len, is_tcp, &features);
         return detected;
     }
+    
+
     
     // Check CoAP (UDP only)
     if (!is_tcp && detect_coap_enhanced(data, len)) {
@@ -269,50 +273,42 @@ int detect_dns_enhanced(const uint8_t* data, size_t len) {
     uint16_t nscount = ntohs(*(uint16_t*)(data + offset + 8));
     uint16_t arcount = ntohs(*(uint16_t*)(data + offset + 10));
     
+    // More lenient validation
     if (qr == 0 && qdcount == 0) return 0;
-    if (qdcount > 100 || ancount > 1000 || nscount > 1000 || arcount > 1000) return 0;
+    if (qdcount > 1000 || ancount > 10000 || nscount > 10000 || arcount > 10000) return 0;
+    
+    // Additional validation: check for valid domain name structure
+    if (len > offset + 12) {
+        uint32_t pos = offset + 12;
+        uint32_t label_count = 0;
+        
+        // Check first few labels
+        while (pos < len && label_count < 10) {
+            uint8_t label_len = data[pos];
+            if (label_len == 0) break; // End of domain name
+            if (label_len > 63) return 0; // Invalid label length
+            pos += label_len + 1;
+            label_count++;
+        }
+    }
     
     return 1;
 }
 
 // Enhanced MQTT Detection
 int detect_mqtt_enhanced(const uint8_t* data, size_t len) {
+
+    
     if (len < 2) return 0;
     
     uint8_t first_byte = data[0];
     uint8_t packet_type = (first_byte >> 4) & 0x0F;
     uint8_t flags = first_byte & 0x0F;
     
-    if (packet_type < 1 || packet_type > 15) return 0;
+
     
-    // Validate flags for specific packet types
-    switch (packet_type) {
-        case 1:  // CONNECT
-            if (flags != 0) return 0;
-            break;
-        case 2:  // CONNACK
-        case 13: // PINGRESP
-        case 14: // DISCONNECT
-            if (flags != 0) return 0;
-            break;
-        case 8:  // SUBSCRIBE
-        case 10: // UNSUBSCRIBE
-            if (flags != 2) return 0;
-            break;
-        case 9:  // SUBACK
-        case 11: // UNSUBACK
-            if (flags != 0) return 0;
-            break;
-        case 3:  // PUBLISH - flags can vary based on QoS, DUP, RETAIN
-            if ((flags & 0x06) == 0x06) return 0; // Invalid QoS 3
-            break;
-        case 4: case 5: case 6: case 7: // PUBACK, PUBREC, PUBREL, PUBCOMP
-            if (flags != 0) return 0;
-            break;
-        case 12: // PINGREQ
-            if (flags != 0) return 0;
-            break;
-    }
+    // Validate packet type (1-15)
+    if (packet_type < 1 || packet_type > 15) return 0;
     
     // Parse variable length remaining length
     uint32_t index = 1;
@@ -327,14 +323,61 @@ int detect_mqtt_enhanced(const uint8_t* data, size_t len) {
         if (multiplier > 128 * 128 * 128) return 0;
     } while (index < len && (data[index-1] & 0x80));
     
+    // Check if we have enough data for the remaining length
     if (index + length > len) return 0;
     
-    // Additional validation for specific packet types
-    if (packet_type == 1 && index + 10 <= len) { // CONNECT
-        if (strncmp((char*)(data + index), "MQTT", 4) != 0 &&
-            strncmp((char*)(data + index), "MQIsdp", 6) != 0) {
+    // Special handling for PINGREQ (packet type 12) - it can have length 0
+    if (packet_type == 12 && length == 0) {
+        return 1; // PINGREQ with length 0 is valid
+    }
+    
+    // Validate flags for specific packet types
+    switch (packet_type) {
+        case 1:  // CONNECT
+            if (flags != 0) return 0;
+            // For CONNECT, validate protocol name
+            if (index + 6 <= len) {
+                uint16_t protocol_name_len = ntohs(*(uint16_t*)(data + index));
+                if (protocol_name_len == 4 && index + 6 + protocol_name_len <= len) {
+                    if (strncmp((char*)(data + index + 2), "MQTT", 4) == 0) {
+                        return 1;
+                    }
+                }
+                if (protocol_name_len == 6 && index + 6 + protocol_name_len <= len) {
+                    if (strncmp((char*)(data + index + 2), "MQIsdp", 6) == 0) {
+                        return 1;
+                    }
+                }
+            }
             return 0;
-        }
+            
+        case 2:  // CONNACK
+        case 13: // PINGRESP
+        case 14: // DISCONNECT
+            if (flags != 0) return 0;
+            break;
+            
+        case 8:  // SUBSCRIBE
+        case 10: // UNSUBSCRIBE
+            if (flags != 2) return 0;
+            break;
+            
+        case 9:  // SUBACK
+        case 11: // UNSUBACK
+            if (flags != 0) return 0;
+            break;
+            
+        case 3:  // PUBLISH - flags can vary based on QoS, DUP, RETAIN
+            if ((flags & 0x06) == 0x06) return 0; // Invalid QoS 3
+            break;
+            
+        case 4: case 5: case 6: case 7: // PUBACK, PUBREC, PUBREL, PUBCOMP
+            if (flags != 0) return 0;
+            break;
+            
+        case 12: // PINGREQ
+            if (flags != 0) return 0;
+            break;
     }
     
     return 1;
@@ -375,6 +418,8 @@ int detect_coap_enhanced(const uint8_t* data, size_t len) {
 
 // Enhanced TLS Detection
 int detect_tls_enhanced(const uint8_t* data, size_t len) {
+
+    
     if (len < 5) return 0;
     
     // Check TLS record header
@@ -414,6 +459,8 @@ int detect_tls_enhanced(const uint8_t* data, size_t len) {
 // Enhanced QUIC Detection
 int detect_quic_enhanced(const uint8_t* data, size_t len) {
     if (len < 6) return 0;
+    
+
     
     // QUIC often starts with specific patterns
     // Check for QUIC version negotiation or initial packets

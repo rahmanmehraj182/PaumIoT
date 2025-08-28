@@ -145,6 +145,33 @@ void update_session_activity(connection_t* session) {
     pthread_mutex_unlock(&session->session_mutex);
 }
 
+void update_session_protocol(int socket_fd, protocol_type_t protocol) {
+    pthread_mutex_lock(&g_server.table_mutex);
+    
+    // Find session by socket fd
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (g_server.connections[i].fd == socket_fd) {
+            connection_t* session = &g_server.connections[i];
+            
+            // Update protocol
+            session->protocol = protocol;
+            
+            // Update session ID to reflect new protocol
+            snprintf(session->session_id, MAX_SESSION_ID, "%s_%d_%ld", 
+                     protocol_to_string(protocol), socket_fd, session->created_at);
+            
+            printf("[SESSION] Updated session %s protocol to %s\n",
+                   session->session_id, protocol_to_string(protocol));
+            
+            pthread_mutex_unlock(&g_server.table_mutex);
+            return;
+        }
+    }
+    
+    pthread_mutex_unlock(&g_server.table_mutex);
+    printf("[SESSION] Warning: Could not find session for fd=%d to update protocol\n", socket_fd);
+}
+
 void print_session_table(void) {
     pthread_mutex_lock(&g_server.table_mutex);
     

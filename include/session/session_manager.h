@@ -9,6 +9,7 @@ int create_session(int socket_fd, struct sockaddr_in *client_addr, protocol_type
 connection_t *get_session_by_socket(int socket_fd);
 void remove_session(int socket_fd);
 void update_session_activity(connection_t *session);
+void update_session_protocol(int socket_fd, protocol_type_t protocol);
 
 // Session table operations
 void print_session_table(void);
