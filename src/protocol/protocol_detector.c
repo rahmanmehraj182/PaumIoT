@@ -411,7 +411,7 @@ int detect_coap_enhanced(const uint8_t* data, size_t len) {
         return 0;
     }
     
-    if (len < 4 + token_length) return 0;
+    if (len < 4 + (size_t)token_length) return 0;
     
     return 1;
 }
@@ -441,7 +441,7 @@ int detect_tls_enhanced(const uint8_t* data, size_t len) {
     }
     
     // Validate length
-    if (length + 5 > len) {
+    if ((size_t)length + 5 > len) {
         return 0;
     }
     
@@ -740,6 +740,8 @@ void cleanup_packet_capture(void) {
 
 // Packet handler for libpcap
 void packet_handler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
+    (void)args;  // Suppress unused parameter warning
+    (void)header;  // Suppress unused parameter warning
     g_server.enhanced_stats.total_packets++;
     
     // Parse Ethernet header
@@ -1221,6 +1223,8 @@ float calculate_transport_compatibility(int is_tcp, protocol_type_t protocol) {
 
 // Calculate context relevance
 float calculate_context_relevance(const uint8_t *data, size_t len, protocol_type_t protocol) {
+    (void)data;  // Suppress unused parameter warning
+    (void)len;   // Suppress unused parameter warning
     // This could be enhanced with connection state analysis
     // For now, return a base score based on protocol characteristics
     switch (protocol) {
@@ -1256,6 +1260,7 @@ float get_historical_accuracy(protocol_type_t protocol) {
 
 // Calculate false positive risk
 float calculate_false_positive_risk(const uint8_t *data, size_t len, protocol_type_t protocol) {
+    (void)data;  // Suppress unused parameter warning
     float risk = 0.3f; // Base risk
     
     switch (protocol) {

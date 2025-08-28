@@ -23,7 +23,7 @@ void handle_mqtt_message(connection_t* conn, const uint8_t* data, size_t len) {
                 // Parse protocol name length
                 if (len >= 14) {
                     uint16_t proto_name_len = (data[2] << 8) | data[3];
-                    if (proto_name_len == 4 && len >= 14 + proto_name_len) {
+                    if (proto_name_len == 4 && len >= 14 + (size_t)proto_name_len) {
                         // Check for "MQTT"
                         if (memcmp(&data[4], "MQTT", 4) == 0) {
                             conn->protocol_data.mqtt.protocol_version = data[8];
@@ -50,7 +50,7 @@ void handle_mqtt_message(connection_t* conn, const uint8_t* data, size_t len) {
             // Parse topic and payload (simplified)
             if (len > 4) {
                 uint16_t topic_len = (data[2] << 8) | data[3];
-                if (len >= 4 + topic_len) {
+                if (len >= 4 + (size_t)topic_len) {
                     printf("[MQTT] Topic length: %d\n", topic_len);
                     // Extract topic name and payload...
                 }
@@ -114,7 +114,7 @@ void handle_coap_message(connection_t* conn, const uint8_t* data, size_t len) {
     conn->protocol_data.coap.message_id_counter = message_id;
     if (token_length <= 8) {
         conn->protocol_data.coap.token_length = token_length;
-        if (len >= 4 + token_length) {
+        if (len >= 4 + (size_t)token_length) {
             memcpy(conn->protocol_data.coap.token, &data[4], token_length);
         }
     }
@@ -143,6 +143,7 @@ void handle_coap_message(connection_t* conn, const uint8_t* data, size_t len) {
 }
 
 void handle_http_message(connection_t* conn, const uint8_t* data, size_t len) {
+    (void)len;  // Suppress unused parameter warning
     char* request = (char*)data;
     printf("[HTTP] Processing request from %s\n", conn->session_id);
     
@@ -150,8 +151,11 @@ void handle_http_message(connection_t* conn, const uint8_t* data, size_t len) {
     char method[16], uri[128], version[16];
     if (sscanf(request, "%15s %127s %15s", method, uri, version) == 3) {
         strncpy(conn->protocol_data.http.method, method, sizeof(conn->protocol_data.http.method) - 1);
+        conn->protocol_data.http.method[sizeof(conn->protocol_data.http.method) - 1] = '\0';
         strncpy(conn->protocol_data.http.uri, uri, sizeof(conn->protocol_data.http.uri) - 1);
+        conn->protocol_data.http.uri[sizeof(conn->protocol_data.http.uri) - 1] = '\0';
         strncpy(conn->protocol_data.http.version, version, sizeof(conn->protocol_data.http.version) - 1);
+        conn->protocol_data.http.version[sizeof(conn->protocol_data.http.version) - 1] = '\0';
         
         printf("[HTTP] Method: %s, URI: %s, Version: %s\n", method, uri, version);
     }
@@ -223,6 +227,7 @@ void handle_http_message(connection_t* conn, const uint8_t* data, size_t len) {
 }
 
 void handle_dns_message(connection_t* conn, const uint8_t* data, size_t len, struct sockaddr_in* client_addr) {
+    (void)client_addr;  // Suppress unused parameter warning
     printf("[DNS] Processing query from %s\n", conn->session_id);
     
     if (len < 12) {
@@ -309,7 +314,7 @@ void handle_dns_message(connection_t* conn, const uint8_t* data, size_t len, str
         }
         
         // Add answer record (simplified A record pointing to localhost)
-        if (resp_pos + 16 < sizeof(response)) {
+        if (resp_pos + 16 < (int)sizeof(response)) {
             // Name (compression pointer to question)
             response[resp_pos++] = 0xC0;
             response[resp_pos++] = 0x0C;
@@ -434,7 +439,7 @@ void handle_quic_message(connection_t* conn, const uint8_t* data, size_t len) {
                 printf("[QUIC] DCIL: %d, SCIL: %d\n", dcil, scil);
                 
                 // Extract connection ID (simplified)
-                if (dcil > 0 && len >= 6 + dcil) {
+                if (dcil > 0 && len >= 6 + (size_t)dcil) {
                     uint64_t conn_id = 0;
                     for (int i = 0; i < dcil && i < 8; i++) {
                         conn_id = (conn_id << 8) | data[6 + i];
