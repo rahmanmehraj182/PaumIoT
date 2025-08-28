@@ -814,22 +814,13 @@ uint8_t calculate_dynamic_confidence(protocol_type_t protocol, const uint8_t *da
     confidence_score += (1.0f - features->false_positive_risk) * weights[8]; // Invert risk
     confidence_score += features->protocol_specificity * weights[9];
     
-    // Debug: Print feature values for first few packets
-    static int debug_count = 0;
-    if (debug_count < 5) {
-        printf("[DEBUG] Protocol: %s, Features: entropy=%.3f, pattern=%.3f, validation=%.3f, header=%.3f, payload=%.3f, transport=%.3f, context=%.3f, history=%.3f, risk=%.3f, specificity=%.3f\n",
-               protocol_to_string(protocol),
-               features->entropy_score, features->pattern_strength, features->validation_depth,
-               features->header_consistency, features->payload_structure, features->transport_compatibility,
-               features->context_relevance, features->historical_accuracy, features->false_positive_risk,
-               features->protocol_specificity);
-        printf("[DEBUG] Raw confidence score: %.3f, Calibration: %.3f, Final: %.3f\n",
-               confidence_score, g_server.enhanced_stats.confidence_calibration_factor, confidence_score);
-        debug_count++;
-    }
+
     
     // Apply calibration factor
     confidence_score *= g_server.enhanced_stats.confidence_calibration_factor;
+    
+    // Convert to percentage (0-100 range)
+    confidence_score *= 100.0f;
     
     // Clamp to valid range
     if (confidence_score < MIN_CONFIDENCE_THRESHOLD) {
