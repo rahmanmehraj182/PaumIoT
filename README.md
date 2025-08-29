@@ -284,6 +284,17 @@ Run the enhanced test suite:
 ```bash
 make test
 ```
+For Specific MQTT testing
+```bash
+
+gcc -o mqtt_test_generator mqtt_packet_generator.c -Wall -Wextra
+
+./mqtt_test_generator
+
+//Optional: Pass target IP as argument:
+./mqtt_test_generator 192.168.1.100
+
+```
 
 This performs comprehensive connectivity tests for all supported protocols including the new TLS and QUIC detection.
 
