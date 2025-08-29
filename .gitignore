@@ -15,8 +15,8 @@ logs/
 
 # Project folders
 tests/
-!tests/mqtt_test.c
-!tests/mqtt_test_file.c
+*tests/mqtt_test.c
+*tests/mqtt_test_file.c
 
 # IDE and editor files
 .vscode/
