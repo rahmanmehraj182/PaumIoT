@@ -50,6 +50,12 @@ typedef struct {
 // Global packet counter
 int packet_count = 0;
 
+// Function declarations
+static int finalize_mqtt_packet(uint8_t *buffer, uint8_t fixed_header,
+                                int body_start, int body_len);
+int encode_remaining_length(uint8_t *buffer, int length);
+
+
 // Utility function to encode remaining length
 int encode_remaining_length(uint8_t *buffer, int length) {
     int bytes = 0;
@@ -63,6 +69,29 @@ int encode_remaining_length(uint8_t *buffer, int length) {
     } while (length > 0);
     return bytes;
 }
+
+
+// Finalize a packet after writing its body starting at body_start.
+// Places fixed header, encodes Remaining Length, and shifts body correctly.
+static int finalize_mqtt_packet(uint8_t *buffer, uint8_t fixed_header,
+                                int body_start, int body_len) {
+    // Encode RL into a temp (max 4 bytes)
+    uint8_t rl_tmp[4];
+    int rl_bytes = encode_remaining_length(rl_tmp, body_len);
+
+    // Move body so it starts right after fixed header + RL
+    // Current body is at buffer[body_start .. body_start+body_len)
+    // Target is buffer[1 + rl_bytes .. 1 + rl_bytes + body_len)
+    memmove(buffer + 1 + rl_bytes, buffer + body_start, body_len);
+
+    // Write fixed header + RL
+    buffer[0] = fixed_header;
+    memcpy(buffer + 1, rl_tmp, rl_bytes);
+
+    // Total length
+    return 1 + rl_bytes + body_len;
+}
+
 int create_connect_packet(uint8_t *buffer, mqtt_config_t *config) {
     // Reserve: [0]=fixed header, [1..4]=worst-case RL
     int pos = 1 + 4;
@@ -110,6 +139,7 @@ int create_connect_packet(uint8_t *buffer, mqtt_config_t *config) {
     uint8_t fixed_header = (uint8_t)(MQTT_CONNECT | (config->flags & 0x0F));
     return finalize_mqtt_packet(buffer, fixed_header, body_start, body_len);
 }
+
 int create_publish_packet(uint8_t *buffer, mqtt_config_t *config) {
     // Build fixed header byte (type + flags)
     uint8_t fixed_header = 0x30; // MQTT_PUBLISH base
@@ -145,6 +175,7 @@ int create_publish_packet(uint8_t *buffer, mqtt_config_t *config) {
     int body_len = pos - body_start;
     return finalize_mqtt_packet(buffer, fixed_header, body_start, body_len);
 }
+
 int create_subscribe_packet(uint8_t *buffer, mqtt_config_t *config) {
     // Fixed header must have flags 0x2 for valid SUBSCRIBE;
     // we still allow fuzzing via config->flags if you want invalid cases.
@@ -171,6 +202,7 @@ int create_subscribe_packet(uint8_t *buffer, mqtt_config_t *config) {
     int body_len = pos - body_start;
     return finalize_mqtt_packet(buffer, fixed_header, body_start, body_len);
 }
+
 int create_simple_packet(uint8_t *buffer, uint8_t packet_type_with_flags) {
     // No body → RL = 0
     buffer[0] = packet_type_with_flags;
@@ -240,7 +272,9 @@ int send_mqtt_packet(uint8_t *buffer, int packet_len, const char *packet_name) {
 void generate_mqtt_combinations() {
     uint8_t buffer[MAX_PACKET_SIZE];
     mqtt_config_t config;
+
     char client_id[32], topic[64], payload[128], username[32], password[32];
+
     
     // Client ID variations
     const char* client_ids[] = {"client1", "test_client", "iot_device", "sensor01"};
@@ -449,6 +483,7 @@ void generate_protocol_confusion_packets() {
     printf("Protocol confusion test packets sent.\n");
 }
 
+
 // --- helpers ---
 // encode_remaining_length(...) stays the same
 
@@ -515,7 +550,6 @@ int main(int argc, char *argv[]) {
 /*
 To compile and run:
 
-gcc -o mqtt_test_generator mqtt_packet_generator.c -Wall -Wextra
 
 ./mqtt_test_generator
 
@@ -542,4 +576,4 @@ The packets are designed to thoroughly test your middleware's ability to:
 
 Each packet follows proper MQTT v3.1.1 specification where applicable,
 with intentional variations and edge cases for comprehensive testing.
-*/
+

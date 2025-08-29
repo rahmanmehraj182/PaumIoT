@@ -13,10 +13,6 @@ logs/
 *.md
 !README.md
 
-# Project folders
-*tests/mqtt_test.c
-*tests/mqtt_test_file.c
-
 # IDE and editor files
 .vscode/
 .idea/
