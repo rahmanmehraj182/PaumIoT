@@ -211,23 +211,23 @@ int handle_tcp_accept(void) {
         return -1;
     }
     
-    connection_t* conn = allocate_connection();
-    if (!conn) {
-        printf("[ACCEPT] No free connections available\n");
+    // Create session first to get the connection object
+    int session_index = create_session(client_fd, &client_addr, PROTOCOL_UNKNOWN);
+    if (session_index == -1) {
+        printf("[ACCEPT] Failed to create session for fd=%d\n", client_fd);
         close(client_fd);
         return -1;
     }
     
-    conn->fd = client_fd;
-    conn->state = CONN_CONNECTED;
-    conn->addr = client_addr;
-    conn->created_at = time(NULL);
-    conn->last_activity = time(NULL);
-    conn->protocol = PROTOCOL_UNKNOWN;
-    init_congestion_control(&conn->congestion);
+    // Use the connection object from the session (same memory)
+    connection_t* conn = &g_server.connections[session_index];
     
-    // Create session
-    create_session(client_fd, &client_addr, PROTOCOL_UNKNOWN);
+    // Initialize connection state (session already has basic info)
+    conn->state = CONN_CONNECTED;
+    conn->detection_confidence = 0;
+    conn->detection_attempts = 0;
+    conn->last_detection = 0;
+    init_congestion_control(&conn->congestion);
     
     if (add_to_epoll(g_server.epoll_fd, client_fd, 
                      EPOLLIN | EPOLLET, conn) == -1) {
@@ -356,23 +356,28 @@ int handle_connection_read(connection_t* conn) {
     // Detect protocol if not known
     if (conn->protocol == PROTOCOL_UNKNOWN && conn->read_pos >= 2) {
         uint8_t confidence = 0;
-        conn->protocol = detect_protocol_enhanced(conn->read_buffer, conn->read_pos, &confidence, 1);
+        protocol_type_t detected_protocol = detect_protocol_enhanced(conn->read_buffer, conn->read_pos, &confidence, 1);
+        
+        // Update connection protocol info
+        conn->protocol = detected_protocol;
         conn->detection_confidence = confidence;
         conn->detection_attempts++;
         conn->last_detection = time(NULL);
         
         printf("[READ] Protocol detected: %s for fd=%d (confidence: %d%%)\n", 
-               protocol_to_string(conn->protocol), conn->fd, confidence);
+               protocol_to_string(detected_protocol), conn->fd, confidence);
         
-        // Update session protocol
-        if (conn->protocol != PROTOCOL_UNKNOWN) {
-            update_session_protocol(conn->fd, conn->protocol);
-        }
-        
-        // Update enhanced statistics
-        if (conn->protocol != PROTOCOL_UNKNOWN) {
+        // Update session protocol atomically
+        if (detected_protocol != PROTOCOL_UNKNOWN) {
+            update_session_protocol(conn->fd, detected_protocol);
+            
+            // Print immediate session state for debugging
+            printf("[DEBUG] Session state after protocol detection:\n");
+            print_session_table();
+            
+            // Update enhanced statistics
             g_server.enhanced_stats.identified_packets++;
-            g_server.enhanced_stats.protocol_count[conn->protocol]++;
+            g_server.enhanced_stats.protocol_count[detected_protocol]++;
             
             if (confidence >= DETECTION_CONFIDENCE_HIGH) {
                 g_server.enhanced_stats.detection_confidence_high++;

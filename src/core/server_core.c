@@ -176,8 +176,8 @@ void server_run(void) {
             last_cleanup = now;
         }
         
-        // Print stats (every 60 seconds)
-        if (now - last_stats > 60) {
+        // Print stats (every 10 seconds for debugging)
+        if (now - last_stats > 10) {
             print_server_stats();
             print_session_table();
             last_stats = now;
