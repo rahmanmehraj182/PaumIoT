@@ -39,7 +39,7 @@ int create_session(int socket_fd, struct sockaddr_in* client_addr, protocol_type
     session->fd = socket_fd;
     session->addr = *client_addr;
     session->protocol = protocol;
-    session->session_state = SESSION_CONNECTED;
+    session->session_state = (protocol == PROTOCOL_UNKNOWN) ? SESSION_CONNECTED : SESSION_ACTIVE;
     session->state = CONN_CONNECTED;
     session->last_activity = time(NULL);
     session->created_at = time(NULL);
@@ -49,6 +49,9 @@ int create_session(int socket_fd, struct sockaddr_in* client_addr, protocol_type
     session->read_pos = 0;
     session->write_pos = 0;
     session->bytes_to_write = 0;
+    session->detection_confidence = 0;
+    session->detection_attempts = 0;
+    session->last_detection = 0;
     
     session->session_flags.flags = SESSION_FLAG_ACTIVE;
     
@@ -138,10 +141,19 @@ void remove_session(int socket_fd) {
 }
 
 void update_session_activity(connection_t* session) {
+    if (!session) return;
+    
     pthread_mutex_lock(&session->session_mutex);
     session->last_activity = time(NULL);
     session->message_count++;
     session->total_messages++;
+    
+    // Update session state based on activity
+    if (session->protocol != PROTOCOL_UNKNOWN && 
+        session->session_state == SESSION_CONNECTED) {
+        session->session_state = SESSION_ACTIVE;
+    }
+    
     pthread_mutex_unlock(&session->session_mutex);
 }
 
@@ -153,15 +165,29 @@ void update_session_protocol(int socket_fd, protocol_type_t protocol) {
         if (g_server.connections[i].fd == socket_fd) {
             connection_t* session = &g_server.connections[i];
             
+            printf("[DEBUG] Found session at index %d, current protocol: %s, new protocol: %s\n", 
+                   i, protocol_to_string(session->protocol), protocol_to_string(protocol));
+            printf("[DEBUG] Current session ID: %s\n", session->session_id);
+            
             // Update protocol
+            protocol_type_t old_protocol = session->protocol;
             session->protocol = protocol;
             
             // Update session ID to reflect new protocol
             snprintf(session->session_id, MAX_SESSION_ID, "%s_%d_%ld", 
                      protocol_to_string(protocol), socket_fd, session->created_at);
             
-            printf("[SESSION] Updated session %s protocol to %s\n",
-                   session->session_id, protocol_to_string(protocol));
+            printf("[DEBUG] New session ID: %s\n", session->session_id);
+            
+            // Update session state to reflect protocol detection
+            if (protocol != PROTOCOL_UNKNOWN && old_protocol == PROTOCOL_UNKNOWN) {
+                session->session_state = SESSION_ACTIVE;
+                printf("[SESSION] Updated session %s protocol to %s (state: Active)\n",
+                       session->session_id, protocol_to_string(protocol));
+            } else {
+                printf("[SESSION] Updated session %s protocol to %s\n",
+                       session->session_id, protocol_to_string(protocol));
+            }
             
             pthread_mutex_unlock(&g_server.table_mutex);
             return;
@@ -177,25 +203,27 @@ void print_session_table(void) {
     
     printf("\n=== SESSION STATE TABLE ===\n");
     printf("Active sessions: %d/%d\n", g_server.session_count, MAX_CLIENTS);
-    printf("%-20s %-8s %-10s %-15s %-15s %-8s %-8s\n", 
-           "Session ID", "Socket", "Protocol", "State", "Client IP", "Messages", "Uptime");
-    printf("----------------------------------------------------------------------------------------\n");
+    printf("%-20s %-8s %-10s %-15s %-15s %-8s %-8s %-8s %-8s\n", 
+           "Session ID", "Socket", "Protocol", "State", "Client IP", "Messages", "Uptime", "Conf", "Detect");
+    printf("----------------------------------------------------------------------------------------------------\n");
     
     time_t now = time(NULL);
     for (int i = 0; i < MAX_CLIENTS; i++) {
         connection_t* session = &g_server.connections[i];
         if (session->fd > 0 && (session->session_flags.flags & SESSION_FLAG_ACTIVE)) {
-            printf("%-20s %-8d %-10s %-15s %-15s %-8u %-8lds\n",
+            printf("%-20s %-8d %-10s %-15s %-15s %-8u %-8lds %-8u%% %-8u\n",
                    session->session_id,
                    session->fd,
                    protocol_to_string(session->protocol),
                    state_to_string(session->session_state),
                    inet_ntoa(session->addr.sin_addr),
                    session->total_messages,
-                   now - session->created_at);
+                   now - session->created_at,
+                   session->detection_confidence,
+                   session->detection_attempts);
         }
     }
-    printf("========================================================================================\n\n");
+    printf("====================================================================================================\n\n");
     
     pthread_mutex_unlock(&g_server.table_mutex);
 }
