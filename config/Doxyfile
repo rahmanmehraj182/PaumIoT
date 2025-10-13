@@ -1,0 +1,69 @@
+# Doxyfile configuration for PaumIoT documentation generation
+
+PROJECT_NAME           = "PaumIoT"
+PROJECT_NUMBER         = "v1.0.0"
+PROJECT_BRIEF          = "IoT Protocol Middleware with MQTT/CoAP Adapters"
+
+OUTPUT_DIRECTORY       = docs
+CREATE_SUBDIRS         = NO
+
+INPUT                  = src include README.md
+INPUT_ENCODING         = UTF-8
+RECURSIVE              = YES
+
+EXCLUDE_PATTERNS       = */build/* */tests/* */.git/*
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+
+GENERATE_LATEX         = YES
+LATEX_OUTPUT           = latex
+
+GENERATE_RTF           = NO
+GENERATE_MAN           = NO
+GENERATE_XML           = YES
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+JAVADOC_AUTOBRIEF      = YES
+MULTILINE_CPP_IS_BRIEF = NO
+
+TAB_SIZE               = 4
+ALIASES                = 
+
+OPTIMIZE_OUTPUT_FOR_C  = YES
+TYPEDEF_HIDES_STRUCT   = NO
+
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+SEARCH_INCLUDES        = YES
+INCLUDE_PATH           = include src
+PREDEFINED             = 
+
+CLASS_DIAGRAMS         = YES
+HAVE_DOT               = YES
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+GROUP_GRAPHS           = YES
+UML_LOOK               = NO
+TEMPLATE_RELATIONS     = NO
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+GRAPHICAL_HIERARCHY    = YES
+DIRECTORY_GRAPH        = YES
+
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO
+
+QUIET                  = NO

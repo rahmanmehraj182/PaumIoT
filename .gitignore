@@ -6,8 +6,7 @@ build/
 *.dylib
 paumiot
 
-# Documentation and logs
-docs/
+# logs
 logs/
 *.log
 *.md
@@ -62,3 +61,7 @@ config.ini
 *~
 *.orig
 *.rej
+
+
+# Docs
+/docs
