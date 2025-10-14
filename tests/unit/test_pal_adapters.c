@@ -21,8 +21,8 @@ void test_message_creation(void) {
     
     message_t *msg = message_create();
     ASSERT_NOT_NULL(msg);
-    ASSERT_NULL(msg->message_id);
-    ASSERT_NULL(msg->timestamp);
+    ASSERT_NOT_NULL(msg->message_id);    /* Auto-generated ID */
+    ASSERT_NOT_NULL(msg->timestamp);     /* Auto-generated timestamp */
     ASSERT_NULL(msg->source);
     ASSERT_NULL(msg->destination);
     ASSERT_NULL(msg->payload);

@@ -103,7 +103,7 @@ static const uint8_t mqtt_connect_packet[] = {
 };
 
 static const uint8_t mqtt_publish_packet[] = {
-    0x30, 0x19,                          /* PUBLISH */
+    0x30, 0x16,                          /* PUBLISH, remaining length = 22 */
     0x00, 0x0A, 't', 'e', 's', 't', '/', 't', 'o', 'p', 'i', 'c',  /* Topic */
     'H', 'e', 'l', 'l', 'o', ' ', 'M', 'Q', 'T', 'T'              /* Payload */
 };
@@ -256,7 +256,7 @@ void test_qos_mapping(void) {
     
     /* Test different QoS levels in MQTT */
     uint8_t mqtt_qos1_packet[] = {
-        0x32, 0x1D,                          /* PUBLISH with QoS 1 */
+        0x32, 0x1C,                          /* PUBLISH with QoS 1, remaining length = 28 */
         0x00, 0x0A, 't', 'e', 's', 't', '/', 't', 'o', 'p', 'i', 'c',  /* Topic */
         0x12, 0x34,                          /* Packet ID */
         'Q', 'o', 'S', ' ', '1', ' ', 'T', 'e', 's', 't'              /* Payload */

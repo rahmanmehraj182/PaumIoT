@@ -19,6 +19,15 @@ struct protocol_adapter;
 typedef struct protocol_adapter protocol_adapter_t;
 
 /**
+ * @brief PAL configuration structure
+ */
+struct pal_config {
+    int max_adapters;                 /**< Maximum number of adapters */
+    size_t max_message_size;          /**< Maximum message size */
+    int timeout_ms;                   /**< Operation timeout in milliseconds */
+};
+
+/**
  * @brief Protocol adapter interface structure
  * 
  * This structure defines the uniform interface that all protocol adapters
@@ -247,6 +256,49 @@ message_t *message_copy(const message_t *src);
  * @return PAUMIOT_SUCCESS on success, error code on failure
  */
 paumiot_result_t message_set_payload(message_t *message, const uint8_t *payload, size_t payload_len);
+
+/**
+ * @brief Generate unique message ID
+ * 
+ * @param buffer Buffer to store ID
+ * @param buf_len Buffer length
+ * @return PAUMIOT_SUCCESS on success, error code on failure
+ */
+paumiot_result_t message_generate_id(char *buffer, size_t buf_len);
+
+/**
+ * @brief Generate ISO8601 timestamp
+ * 
+ * @param buffer Buffer to store timestamp
+ * @param buf_len Buffer length
+ * @return PAUMIOT_SUCCESS on success, error code on failure
+ */
+paumiot_result_t message_generate_timestamp(char *buffer, size_t buf_len);
+
+/* Helper macros for adapter implementations */
+#define PAL_MAX_ADAPTERS 16
+#define PAL_MAX_PACKET_SIZE 65536
+
+#define ADAPTER_VALIDATE_PACKET(packet, len, min_len) \
+    do { \
+        if (!packet || len < min_len) { \
+            return PAUMIOT_ERROR_INVALID_PARAM; \
+        } \
+    } while(0)
+
+#define ADAPTER_VALIDATE_MESSAGE(msg) \
+    do { \
+        if (!msg || !msg->destination) { \
+            return PAUMIOT_ERROR_INVALID_PARAM; \
+        } \
+    } while(0)
+
+#define ADAPTER_UPDATE_STATS(adapter, field) \
+    do { \
+        if (adapter && adapter->private_data) { \
+            /* Update adapter statistics */ \
+        } \
+    } while(0)
 
 /* Built-in adapters */
 extern protocol_adapter_t mqtt_adapter;  /**< MQTT adapter instance */

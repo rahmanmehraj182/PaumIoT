@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
+
 /* Result type for function returns */
 typedef enum {
     PAUMIOT_SUCCESS = 0,
