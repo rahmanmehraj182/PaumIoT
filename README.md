@@ -70,34 +70,34 @@ Every component follows this strict workflow:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    CLIENT DEVICES                        │
-│              (with PaumIoT Client Plugin)                │
+│                    CLIENT DEVICES                       │
+│              (with PaumIoT Client Plugin)               │
 └────────────────────┬────────────────────────────────────┘
                      │ Network (TCP/UDP/TLS/DTLS)
                      ▼
 ┌─────────────────────────────────────────────────────────┐
-│                  PAUMIOT MIDDLEWARE                      │
-│                                                          │
+│                  PAUMIOT MIDDLEWARE                     │
+│                                                         │
 │  ┌────────────────────────────────────────────────────┐ │
 │  │           INITIATOR LAYER                          │ │
-│  │  Protocol Detection | Connection Mgmt | Routing   │ │
+│  │  Protocol Detection | Connection Mgmt | Routing    │ │
 │  └──────────────────┬─────────────────────────────────┘ │
-│                     ▼                                    │
+│                     ▼                                   │
 │  ┌────────────────────────────────────────────────────┐ │
 │  │     PROTOCOL ADAPTATION LAYER (PAL)                │ │
-│  │  MQTT Adapter | CoAP Adapter | Future Protocols   │ │
+│  │  MQTT Adapter | CoAP Adapter | Future Protocols    │ │
 │  └──────────────────┬─────────────────────────────────┘ │
-│                     ▼                                    │
+│                     ▼                                   │
 │  ┌────────────────────────────────────────────────────┐ │
 │  │              ENGINE                                │ │
-│  │  Request Processing | Traffic Mgmt | Orchestration│ │
+│  │  Request Processing | Traffic Mgmt | Orchestration │ │
 │  └─────────┬──────────────────────┬───────────────────┘ │
-│            │                      │                      │
-│            ▼                      ▼                      │
-│  ┌──────────────────┐  ┌───────────────────────────┐   │
-│  │ SENSOR MANAGER   │  │  STATE MANAGEMENT         │   │
-│  │                  │◄─┤                           │   │
-│  └──────────────────┘  └───────────────────────────┘   │
+│            │                      │                     │
+│            ▼                      ▼                     │
+│  ┌──────────────────┐  ┌───────────────────────────┐    │
+│  │ SENSOR MANAGER   │  │  STATE MANAGEMENT         │    │
+│  │                  │◄─┤                           │    │
+│  └──────────────────┘  └───────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
 ```
 
