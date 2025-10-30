@@ -12,6 +12,7 @@ BUILD_DIR = build
 COMMON_SRC = common/src
 COMMON_INC = common/include
 TEST_DIR = tests/unit
+INTEGRATION_DIR = tests/integration
 
 # Source files
 COMMON_SRCS = $(COMMON_SRC)/errors.c \
@@ -32,12 +33,17 @@ TESTS = $(BUILD_DIR)/test_types \
         $(BUILD_DIR)/test_memory_pool \
         $(BUILD_DIR)/test_queue
 
+# Integration test executable
+INTEGRATION_TEST = $(BUILD_DIR)/test_integration
+
 # Default target
 .PHONY: all
-all: $(BUILD_DIR) $(COMMON_OBJS) $(TESTS)
+all: $(BUILD_DIR) $(COMMON_OBJS) $(TESTS) $(INTEGRATION_TEST)
 	@echo ""
 	@echo "✅ Build complete!"
-	@echo "   Run 'make test' to run all tests"
+	@echo "   Run 'make test' to run unit tests"
+	@echo "   Run 'make test-integration' to run integration tests"
+	@echo "   Run 'make test-all' to run all tests"
 
 # Create build directory
 $(BUILD_DIR):
@@ -72,7 +78,11 @@ $(BUILD_DIR)/test_memory_pool: $(TEST_DIR)/test_memory_pool.c $(BUILD_DIR)/memor
 $(BUILD_DIR)/test_queue: $(TEST_DIR)/test_queue.c $(BUILD_DIR)/queue.o
 	$(CC) $(CFLAGS) $(INCLUDES) $< $(BUILD_DIR)/queue.o -lpthread -o $@
 
-# Run all tests
+# Build integration test
+$(BUILD_DIR)/test_integration: $(INTEGRATION_DIR)/test_integration.c $(COMMON_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) $< $(COMMON_OBJS) -lpthread -o $@
+
+# Run unit tests
 .PHONY: test
 test: all
 	@echo ""
@@ -120,6 +130,24 @@ test-memory-pool: $(BUILD_DIR)/test_memory_pool
 test-queue: $(BUILD_DIR)/test_queue
 	@$(BUILD_DIR)/test_queue
 
+# Run integration tests
+.PHONY: test-integration
+test-integration: $(BUILD_DIR)/test_integration
+	@echo ""
+	@echo "=========================================="
+	@echo "Running integration tests..."
+	@echo "=========================================="
+	@echo ""
+	@$(BUILD_DIR)/test_integration
+	@echo ""
+
+# Run all tests (unit + integration)
+.PHONY: test-all
+test-all: test test-integration
+	@echo "=========================================="
+	@echo "✅ All unit and integration tests passed!"
+	@echo "=========================================="
+
 # Clean build artifacts
 .PHONY: clean
 clean:
@@ -136,13 +164,15 @@ help:
 	@echo "PaumIoT Build System - Common Utilities"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make              - Build all components and tests"
-	@echo "  make test         - Build and run all tests"
-	@echo "  make test-types   - Run only types test"
-	@echo "  make test-errors  - Run only errors test"
-	@echo "  make test-logging - Run only logging test"
+	@echo "  make                  - Build all components and tests"
+	@echo "  make test             - Build and run unit tests"
+	@echo "  make test-integration - Run integration tests"
+	@echo "  make test-all         - Run all unit and integration tests"
+	@echo "  make test-types       - Run only types test"
+	@echo "  make test-errors      - Run only errors test"
+	@echo "  make test-logging     - Run only logging test"
 	@echo "  make test-memory-pool - Run only memory pool test"
-	@echo "  make test-queue   - Run only queue test"
-	@echo "  make clean        - Remove build artifacts"
-	@echo "  make rebuild      - Clean and rebuild everything"
-	@echo "  make help         - Show this help message"
+	@echo "  make test-queue       - Run only queue test"
+	@echo "  make clean            - Remove build artifacts"
+	@echo "  make rebuild          - Clean and rebuild everything"
+	@echo "  make help             - Show this help message"
