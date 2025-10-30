@@ -6,8 +6,7 @@ build/
 *.dylib
 paumiot
 
-# Documentation and logs
-docs/
+# logs
 logs/
 *.log
 *.md
@@ -62,3 +61,11 @@ config.ini
 *~
 *.orig
 *.rej
+
+# Docs
+/docs
+
+# Tests - ignore old test files but allow Phase 1 tests
+/tests/unit/test_pal_adapters.c
+/tests/integration/test_protocol_integration.c
+/tests/test_framework.h
