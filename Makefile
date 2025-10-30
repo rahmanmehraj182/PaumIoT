@@ -16,18 +16,21 @@ TEST_DIR = tests/unit
 # Source files
 COMMON_SRCS = $(COMMON_SRC)/errors.c \
               $(COMMON_SRC)/logging.c \
-              $(COMMON_SRC)/memory_pool.c
+              $(COMMON_SRC)/memory_pool.c \
+              $(COMMON_SRC)/queue.c
 
 # Object files
 COMMON_OBJS = $(BUILD_DIR)/errors.o \
               $(BUILD_DIR)/logging.o \
-              $(BUILD_DIR)/memory_pool.o
+              $(BUILD_DIR)/memory_pool.o \
+              $(BUILD_DIR)/queue.o
 
 # Test executables
 TESTS = $(BUILD_DIR)/test_types \
         $(BUILD_DIR)/test_errors \
         $(BUILD_DIR)/test_logging \
-        $(BUILD_DIR)/test_memory_pool
+        $(BUILD_DIR)/test_memory_pool \
+        $(BUILD_DIR)/test_queue
 
 # Default target
 .PHONY: all
@@ -50,6 +53,9 @@ $(BUILD_DIR)/logging.o: $(COMMON_SRC)/logging.c $(COMMON_INC)/logging.h
 $(BUILD_DIR)/memory_pool.o: $(COMMON_SRC)/memory_pool.c $(COMMON_INC)/memory_pool.h
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
+$(BUILD_DIR)/queue.o: $(COMMON_SRC)/queue.c $(COMMON_INC)/queue.h $(COMMON_INC)/types.h
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
 # Build tests
 $(BUILD_DIR)/test_types: $(TEST_DIR)/test_types.c $(COMMON_INC)/types.h
 	$(CC) $(CFLAGS) $(INCLUDES) $< -o $@
@@ -62,6 +68,9 @@ $(BUILD_DIR)/test_logging: $(TEST_DIR)/test_logging.c $(BUILD_DIR)/logging.o
 
 $(BUILD_DIR)/test_memory_pool: $(TEST_DIR)/test_memory_pool.c $(BUILD_DIR)/memory_pool.o
 	$(CC) $(CFLAGS) $(INCLUDES) $< $(BUILD_DIR)/memory_pool.o -o $@
+
+$(BUILD_DIR)/test_queue: $(TEST_DIR)/test_queue.c $(BUILD_DIR)/queue.o
+	$(CC) $(CFLAGS) $(INCLUDES) $< $(BUILD_DIR)/queue.o -lpthread -o $@
 
 # Run all tests
 .PHONY: test
@@ -83,6 +92,9 @@ test: all
 	@echo "→ Running test_memory_pool..."
 	@$(BUILD_DIR)/test_memory_pool
 	@echo ""
+	@echo "→ Running test_queue..."
+	@$(BUILD_DIR)/test_queue
+	@echo ""
 	@echo "=========================================="
 	@echo "✅ All tests completed successfully!"
 	@echo "=========================================="
@@ -103,6 +115,10 @@ test-logging: $(BUILD_DIR)/test_logging
 .PHONY: test-memory-pool
 test-memory-pool: $(BUILD_DIR)/test_memory_pool
 	@$(BUILD_DIR)/test_memory_pool
+
+.PHONY: test-queue
+test-queue: $(BUILD_DIR)/test_queue
+	@$(BUILD_DIR)/test_queue
 
 # Clean build artifacts
 .PHONY: clean
@@ -126,6 +142,7 @@ help:
 	@echo "  make test-errors  - Run only errors test"
 	@echo "  make test-logging - Run only logging test"
 	@echo "  make test-memory-pool - Run only memory pool test"
+	@echo "  make test-queue   - Run only queue test"
 	@echo "  make clean        - Remove build artifacts"
 	@echo "  make rebuild      - Clean and rebuild everything"
 	@echo "  make help         - Show this help message"

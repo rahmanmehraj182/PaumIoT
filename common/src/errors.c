@@ -21,6 +21,12 @@ const char *paumiot_error_string(paumiot_result_t code) {
         case PAUMIOT_ERROR_BUFFER_TOO_SMALL:
             return "Buffer too small";
         
+        /* Queue errors */
+        case PAUMIOT_ERROR_QUEUE_FULL:
+            return "Queue is full";
+        case PAUMIOT_ERROR_QUEUE_EMPTY:
+            return "Queue is empty";
+        
         /* State errors */
         case PAUMIOT_ERROR_NOT_FOUND:
             return "Not found";
